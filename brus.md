@@ -87,6 +87,6 @@ print('chi-square:', chi2)
 
 3. **Chi-square**: Provides an additional measure of fit quality.
 
-![Fitted Curve](path_to_your_image.png)
+![Fitted Curve](brus.png)
 
 *Figure: Plot of the original data and the fitted curve.*
