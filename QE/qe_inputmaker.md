@@ -2,7 +2,23 @@
 
 This script generates a Self-Consistent Field (SCF) input file for Quantum ESPRESSO based on a CIF file. It reads the atomic structure from the CIF file and generates the necessary input parameters for SCF calculations.
 
-### Code Explanation
+## Explanation
+
+- **Imports**: The script imports `read` from `ase.io` to read CIF files.
+  
+- **`SCFGenerator` Class**: Manages the creation of the SCF input file.
+
+  - **`__init__` Method**: Initializes with a CIF file path and output directory. Reads the atomic structure and sets the output directory.
+  
+  - **`_get_unique_atom_symbols` Method**: Returns a sorted string of unique atomic symbols.
+  
+  - **`_write_atomic_species` Method**: Writes the `ATOMIC_SPECIES` section, including element types, masses, and pseudopotential file names.
+  
+  - **`_write_atomic_positions` Method**: Writes atomic positions in the `ATOMIC_POSITIONS` section.
+  
+  - **`_write_cell_parameters` Method**: Writes lattice vectors in the `CELL_PARAMETERS` section.
+  
+  - **`get_input` Method**: Creates and writes the SCF input file, including sections for control parameters, system details, and electron settings. It also calls methods to write atomic species, positions, and cell parameters, and sets up k-points for the automatic grid.
 
 ```python
 from ase.io import read
