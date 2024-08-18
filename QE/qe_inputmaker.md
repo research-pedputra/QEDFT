@@ -56,7 +56,7 @@ Ensure that the `ase` library is installed and that you have set up your Quantum
 #### Import the class
 
 ```python
-from qeinputmaker import SCFNSCFGenerator
+from qeinputmaker import classname
 ```
 
 #### Initialize for file input making
