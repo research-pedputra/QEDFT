@@ -33,7 +33,7 @@ class BackSub:
 class peaks:
     def __init__(self, x, y):
         self.x = np.array(x)
-        self.y = np.array(y)
+        self.y = savgol_filter(np.array(y), 11, 3)
         self.peaks_array = None
 
     def find_peaks(self, height=None, distance=None, prominence=None, width=None):
