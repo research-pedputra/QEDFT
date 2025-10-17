@@ -1,48 +1,49 @@
 # myqetools API Guide
 
-Comprehensive guide for the object-oriented helpers defined in `myqetools.py`. The toolkit streamlines post-processing of Quantum ESPRESSO (QE) calculations, covering band structures, effective masses, projected density of states (PDOS), charge densities, and energetic analyses. This document explains every public class, the data each method expects, and practical usage patterns so you can integrate the utilities into notebooks, scripts, or reproducible GitHub workflows.
+Comprehensive guide for the object-oriented helpers defined in `myqetools.py`. The toolkit streamlines post-processing of Quantum ESPRESSO (QE) calculations, covering band structures, effective masses, projected density of states (PDOS), charge densities, and energetic analyses. Use this document to understand each class individually and to compose them into larger workflows.
 
 > **TL;DR workflow**  
-> 1. Load raw QE outputs (band `.gnu`, PDOS `.dat`, charge-density `.pp`, SCF text, etc.).  
-> 2. Instantiate the relevant class (for example `BandStructure` followed by `EffectiveMassAnalyzer`).  
+> 1. Load raw QE outputs (band `.gnu`, PDOS `.dat`, charge-density `.pp`, SCF logs, etc.).  
+> 2. Instantiate the relevant class (for example `BandStructure`, then `EffectiveMassAnalyzer`).  
 > 3. Call plotting or analysis helpers to visualise or extract metrics.  
-> 4. Combine results in your reports or automation scripts.
+> 4. Combine results in notebooks, scripts, or GitHub automation.
 
 ---
 
-## 1. Prerequisites
+## Prerequisites
 
-- **Python**: 3.9+ recommended.
-- **Dependencies**: `numpy`, `matplotlib`, `scipy`, and `ase` (`pip install numpy matplotlib scipy ase`).
+- **Python**: 3.9 or newer recommended.
+- **Dependencies**: `numpy`, `matplotlib`, `scipy`, `ase`.
+  - Install via `pip install numpy matplotlib scipy ase`.
 - **QE outputs**:
-  - Band structure: plain text with two columns (`k`, `energy`) as produced by `bands.x`.
-  - PDOS: `.dat` files created by `projwfc.x`.
-  - Charge density: `.pp` files (converted to plain text with a 50-line header).
-  - SCF/relax output: `pw.x` stdout log.
-  - QE input (`*.in`) or output (`*.out`) structures for geometry utilities.
+  - Band structure: two-column text (`k`, `energy`) from `bands.x` (`*.bands.gnu`).
+  - PDOS: `.dat` files from `projwfc.x`.
+  - Charge density: `.pp` data exported to plain text with a 50-line header.
+  - SCF or relaxation logs from `pw.x`.
+  - QE structure files in `espresso-in` / `espresso-out` format.
 
-All plotting functions rely on Matplotlib’s current backend; run in an environment that supports figure rendering (Jupyter, VS Code, or a desktop Python session).
+Ensure your environment supports Matplotlib rendering (Jupyter, VS Code, or a desktop Python session).
 
 ---
 
-## 2. Quick Start Example
+## Quick Start Example
 
 ```python
 import numpy as np
 from myqetools import BandStructure, EffectiveMassAnalyzer
 
-# 1) Load band structure data exported from bands.x (.bands.gnu format)
+# 1) Load band structure data exported by bands.x (.bands.gnu format)
 fermi = 5.6925
 data = np.loadtxt("CsGeCl.bands.gnu")
-high_symmetry = [("Γ", 0.0), ("M", 0.7071), ("R", 1.2071), ("X", 1.9142)]
+high_symmetry = [("Gamma", 0.0), ("M", 0.7071), ("R", 1.2071), ("X", 1.9142)]
 
-# 2) Prepare the band structure object and draw the plot
+# 2) Build the band structure object and draw the plot
 bs = BandStructure()
 bs.get_bandstructure(data, fermi, high_symmetry)
 bs.plot_shifted_band_structure(start_band_number=23, shift_value=1.827)  # optional rigid shift
 bs.save_figure("band_structure.png")
 
-# 3) Analyse sub-gap effective masses around the extrema
+# 3) Analyse effective masses around the extrema
 analyzer = EffectiveMassAnalyzer(bs)
 me, mh, Eg = analyzer.analyze(
     VBM_main=22,
@@ -55,190 +56,156 @@ me, mh, Eg = analyzer.analyze(
 print(f"Electron m* = {me:.3f} m_e, Hole m* = {mh:.3f} m_e, Eg = {Eg:.3f} eV")
 ```
 
-The remaining sections describe every class in detail so you can chain analyses beyond the example above.
-
 ---
 
-## 3. Band-Resolved Analysis
+## Class Reference
 
-### 3.1 `BandStructure`
+Each subsection documents one class from `myqetools.py`, including purpose, required inputs, and key methods.
 
-Purpose: Load band energies sampled along a k-path and provide convenient plotting and slicing utilities.
+### BandStructure
 
-| Method | Description |
-| --- | --- |
-| `get_bandstructure(data, fermi_energy, kpoints)` | Accepts a 2-column array (`k`, `energy`) and reshapes it into `(nbands, nk)` for internal use. `kpoints` is a list of `(label, path_coordinate)` pairs marking high-symmetry points. |
-| `plot_band_structure()` | Plots every band shifted by the stored Fermi level. Axis limits default to ±5 eV around `E_f`. |
-| `plot_band_number(band_number, overlay=True)` | Highlights an individual band, either overlayed on the main figure or in a separate plot. |
-| `shift_band(start_band_number, shift_value)` / `plot_shifted_band_structure(...)` | Apply a rigid energy shift to bands at or above `start_band_number` before plotting (useful for scissor corrections). |
-| `get_band_data_point(band_number)` | Returns `(k_values, energies)` for the requested band with the Fermi level removed. |
-| `save_figure(filename, dpi=300, transparent=True)` | Persist the latest band structure figure. |
+**Purpose**: Load and manipulate band energies sampled along a k-path.
 
-> **Tip**: Load GMO/bands data via `numpy.loadtxt`. Ensure the rows are ordered by band index and k-point, exactly as exported by QE (`bands.x`).
+- `get_bandstructure(data, fermi_energy, kpoints)`: Accepts a two-column array (`k`, `energy`). Internally reshapes to `(n_bands, n_kpoints)` and stores the Fermi level. `kpoints` is a list of `(label, coordinate)` pairs marking high-symmetry points.
+- `plot_band_structure()`: Plots all bands shifted by the Fermi energy. X-axis ticks are labelled with high-symmetry points if supplied.
+- `plot_band_number(band_number, overlay=True)`: Highlights an individual band. With `overlay=True`, draws on the existing figure; otherwise spawns a standalone plot.
+- `shift_band(start_band_number, shift_value)`: Applies a rigid energy shift to bands at or above `start_band_number`. Use before plotting to mimic scissor corrections.
+- `plot_shifted_band_structure(start_band_number, shift_value)`: Convenience wrapper that calls `shift_band` then `plot_band_structure`.
+- `get_band_data_point(band_number)`: Returns `(k_values, energies_minus_fermi)` for further analysis.
+- `save_figure(filename="band_structure.png", dpi=300, transparent=True)`: Writes the most recent figure to disk.
 
-### 3.2 `EffectiveMassAnalyzer`
+### EffectiveMassAnalyzer
 
-Purpose: Compute electron and hole effective masses by averaging curvature of the selected conduction and valence bands.
+**Purpose**: Compute electron and hole effective masses using curvature fits near the band extrema.
 
-- Initialise with an existing `BandStructure` instance: `analyzer = EffectiveMassAnalyzer(bs)`.
-- Call `analyze(...)` with the band indices and the k-index ranges that bracket the parabolic region near the extremum. Parameters:
-  - `VBM_main`, `CBM_main`: primary band numbers for valence and conduction edges (1-indexed, matching the `.bands.gnu` ordering).
-  - `VBM_degenerate`, `CBM_degenerate`: optional lists of additional degenerate bands to average.
-  - `range_e`, `range_h`: tuples `(start_index, end_index)` specifying the slice in k-space used for the curvature fit.
-- Returns `(m_e*, m_h*, Eg)` and prints a report. Internal helper `_plot_effective_mass` visualises the scatter and spline fit for each side.
-- Use `get_band_gap(valence_band, conduction_band)` if you only need the gap from arrays.
+- Instantiate with an existing `BandStructure`: `analyzer = EffectiveMassAnalyzer(bs)`.
+- `analyze(VBM_main, CBM_main, VBM_degenerate=None, CBM_degenerate=None, range_e=(35, 45), range_h=(35, 45))`:
+  - `VBM_main`, `CBM_main`: 1-indexed band numbers for valence-band maximum and conduction-band minimum.
+  - `VBM_degenerate`, `CBM_degenerate`: optional lists of additional band indices that share the extremum.
+  - `range_e`, `range_h`: tuples of `(start_idx, end_idx)` in k-space used for curvature averaging.
+  - Returns `(electron_mass, hole_mass, band_gap)` and prints human-readable output.
+- `get_band_gap(valence_band, conduction_band)`: Static helper that computes the gap between two arrays.
+- Internally `_plot_effective_mass(...)` produces scatter/fit plots to validate the curvature region.
 
-### 3.3 `EffectiveMass`
+### EffectiveMass
 
-Purpose: Lightweight alternative that estimates an average effective mass across several bands.
+**Purpose**: Lightweight average effective mass estimator for selected bands.
 
-- Instantiate with the same `BandStructure` object.
-- `calculate_average_mass(band_indices, k_range=None, plot=False)` loops over the selected bands, optionally clips the k-range (`(start, end)` indices), and returns the mean effective mass computed by finite differences (`np.gradient`). Set `plot=True` to inspect the energy slices used for the fit.
+- Instantiate with `EffectiveMass(bandstructure)`.
+- `calculate_average_mass(band_indices, k_range=None, plot=False)`:
+  - Iterates over the provided bands, optionally slices the k-range, and computes second derivatives via `numpy.gradient`.
+  - Setting `plot=True` visualises the selected band segments.
+- `effmass(E, k)`: Core routine returning the effective mass (in electron masses) for a single `(E, k)` pair of arrays.
 
----
+### PDOSPlotter
 
-## 4. Density of States & Orbital Analysis
+**Purpose**: Plot projected density of states (PDOS) data from `projwfc.x`.
 
-### 4.1 `PDOSPlotter`
+- Instantiate with `PDOSPlotter(fermi_energy, orientation="vertical")`.
+- `read_pdos(filepath)`: Returns `(energy_minus_fermi, pdos_array)` for that file.
+- `infer_label(filepath)`: Generates a legend label such as `Pb(p)` based on the filename pattern.
+- `plot(files, xlim=None, ylim=None, orientation=None, figsize=(8, 6))`:
+  - `files` is a dictionary `{key: (color, filepath)}`.
+  - Supports spin-collinear PDOS (two columns) by mirroring the spin-down channel when plotting vertically.
+  - `orientation="horizontal"` swaps axes, useful when stacking beside band plots.
 
-Plot total or spin-resolved projected DOS.
+### OrbitalCenter
 
-- Construct with a Fermi level in eV: `plotter = PDOSPlotter(fermi_energy, orientation="vertical")`.
-- `plot(files, xlim=None, ylim=None, orientation=None, figsize=(8, 6))` expects a dictionary of the form:
+**Purpose**: Identify energy positions where a PDOS curve reaches minimal or maximal intensity.
+
+- Requires a global variable `fermi_energy` defined before instantiation (`OrbitalCenter` reads it at module scope).
+- `_load_data()`: Internal loader called during `__init__` to fill `energy` (shifted by Fermi level) and `pdos`.
+- `get_extreme_positions(x_min=None, x_max=None)`:
+  - Optionally restricts the PDOS window.
+  - Returns `(energy_at_minimum, energy_at_maximum)` of the total PDOS.
+
+### ChargeDensitySlice
+
+**Purpose**: Visualise and compare three-dimensional charge density grids from QE.
+
+- Instantiate with the FFT grid sizes and lattice constants:
 
   ```python
-  files = {
-      "Pb_p": ("red", "Pb_p.dat"),
-      "Br_p": ("green", "(Br)_(p).dat"),
-  }
-  plotter.plot(files, xlim=(-5, 5))
+  cd = ChargeDensitySlice("charge.pp.txt", x1=120, x2=120, x3=120, a=11.95, b=11.95, c=11.95)
   ```
 
-- The helper automatically reads each file, subtracts the Fermi level, and infers labels such as `Pb(p)` for legend entries. If the PDOS file contains two columns after the energy (spin up / spin down), the routine mirrors the down component when plotting vertical orientation.
-- `orientation="horizontal"` swaps axes, helpful for stacking with band plots.
-- Use `read_pdos(filepath)` if you need the raw `(energy, pdos_array)` pair without plotting.
+- The constructor converts charge density units from bohr^-3 to angstrom^-3 and reshapes the array.
+- `plot_slice(hkl="001", position=None, interpolation="gaussian")`: Displays a 2D slice perpendicular to the chosen Miller plane. `position` defines the real-space offset along the corresponding lattice vector; defaults to the central plane.
+- `plot_line_profile(axis="z", ix=None, iy=None, iz=None)`: Extracts and plots a 1D cut along the selected axis; other indices default to midpoints.
+- `get_line_profile(axis="z", index1=None, index2=None)`: Returns `(coordinates, profile)` without plotting.
+- `plot_charge_density_difference(file1, file2, x1, x2, x3, a, b, c, axis="z", index1=None, index2=None, label1="file1", label2="file2", diff_label="Difference")`: Class-level helper that compares two charge-density files along the same line cut.
 
-### 4.2 `OrbitalCenter`
+### QeInputFile
 
-Find the energy positions where a specific orbital PDOS is minimal or maximal, optionally within a sub-window.
+**Purpose**: Compute interatomic distances from QE input files using ASE.
 
-```python
-fermi_energy = 3.5926  # must exist in the namespace before instantiating!
-oc = OrbitalCenter("PDOS/(Pb)_(p).dat")
-emin, emax = oc.get_extreme_positions(x_min=0.0, x_max=4.0)
-```
+- Accepts a single path or list of paths: `qe = QeInputFile(["scf.in", "relax.in"])`.
+- `get_atom_indices(atoms, symbol)`: Return indices of atoms matching the element symbol.
+- `get_all_distances(atoms, symbol1, symbol2)`: Compute every pairwise distance between the specified species (excluding self-pairs).
+- `print_average_distances(symbol1, symbol2)`: For each file, prints the average of the distances computed above.
 
-> **Important**: The class reads the module-level variable `fermi_energy`. Define it before creating an `OrbitalCenter` instance, or refactor the class to pass the value explicitly.
+### Minimaout
 
----
+**Purpose**: Inspect relaxed geometries from QE output (`espresso-out`) files.
 
-## 5. Charge Density Post-Processing
+- Instantiate with `Minimaout("scf.out")` or any geometry-containing log.
+- `get_atomic_positions(exclude_element="O")`: Returns Cartesian and fractional coordinates for all atoms except the excluded species.
+- `find_highest_z_coordinates(exclude_element="O")`: Identifies the top two atoms along the z-direction and reports their coordinates together with the z-separation.
 
-### 5.1 `ChargeDensitySlice`
+### Minimain
 
-Visualise and compare real-space charge densities imported from QE `.pp` files (converted to plain text with a 50-line header).
+**Purpose**: Analyse initial structures from QE input (`espresso-in`) files.
 
-```python
-cd = ChargeDensitySlice(
-    file_path="pure.pp.txt",  # plain text data
-    x1=120, x2=120, x3=120,   # FFT grid dimensions
-    a=11.95, b=11.95, c=11.95 # lattice vectors in Å
-)
-```
+- Methods mirror `Minimaout`:
+  - `get_atomic_positions(exclude_element="O")`.
+  - `find_highest_z_coordinates(exclude_element="O")`.
+- Use it to compare starting and final geometries within the same workflow.
 
-Key methods:
+### TotalEnergy
 
-- `plot_slice(hkl='001', position=None, interpolation='gaussian')`: Draws a 2D slice perpendicular to the specified Miller index. `position` is a real-space distance along the lattice vector; omitted value defaults to the mid-plane.
-- `plot_line_profile(axis='z', ix=None, iy=None, iz=None)`: Extracts and plots a 1D line cut along the chosen axis, fixing the other coordinates (defaults to midpoints).
-- `get_line_profile(axis='z', index1=None, index2=None)`: Returns `(coordinates, profile)` for scripting without plotting.
-- `plot_charge_density_difference(...)`: Class-level helper that loads two files, aligns the same line profile, and plots the difference. Call it as `ChargeDensitySlice.plot_charge_density_difference(file1=..., file2=..., ...)`.
+**Purpose**: Extract the final total energy from QE SCF logs.
 
-All charge densities are converted from Bohr units to Å⁻³ during initialisation.
+- Instantiate with `TotalEnergy("scf.out")`.
+- `extract()`: Stream through the file and capture the last line containing `"!    total energy"`, storing the value in Ry.
+- `last_TotalEnergy()`: Print the stored energy in both Ry and eV. Requires a prior call to `extract()`.
 
----
+### SurfaceEnergyCalculator
 
-## 6. Geometry Utilities
+**Purpose**: Convert slab energies into surface energies.
 
-### 6.1 `QeInputFile`
+- Instantiate optionally overriding the Ry-to-J/m² factor: `SurfaceEnergyCalculator(ry_to_jm2=217.9863)`.
+- `surf(data, bulk, N, area)`:
+  - `data`: iterable of slab energies (Ry).
+  - `bulk`: bulk energy per formula unit (Ry).
+  - `N`: number of bulk units in the slab.
+  - `area`: iterable of surface areas (square angstrom).
+  - Returns surface energies in J/m².
 
-Parse one or multiple QE input structures (`*.in`) and compute interatomic statistics using ASE.
+### AdsorptionCalculator
 
-- Instantiate with either a single file path or a list: `qe = QeInputFile(["scf.in", "relax.in"])`.
-- `print_average_distances(symbol1, symbol2)` prints the average distance between every pair of atoms matching the provided symbols across all files.
-- `get_all_distances(atoms, symbol1, symbol2)` and `get_atom_indices(atoms, symbol)` are exposed for finer-grained scripting.
+**Purpose**: Evaluate adsorption energies and Arrhenius-type desorption times.
 
-### 6.2 `Minimaout` and `Minimain`
-
-Extract atomic positions from QE output (`espresso-out`) or input (`espresso-in`) files respectively.
-
-- `get_atomic_positions(exclude_element='O')` returns tuples of Cartesian and fractional coordinates after removing unwanted elements (defaults to dropping oxygen).
-- `find_highest_z_coordinates(exclude_element='O')` identifies the highest and second-highest atoms along z, and reports their Cartesian/Fractional coordinates alongside the vertical separation. Useful for surface adsorption analyses.
-
-Both classes rely on ASE’s parsers; ensure the corresponding `ase.io.read` format support (`espresso-out`, `espresso-in`) is available.
+- Instantiate with `AdsorptionCalculator(Eadsorbate, ry_to_eV=13.605698066, kBT=0.0258519)`.
+- `Eadsorption(Esys, Eadsorbant)`: Returns `(Esys - (Eadsorbant + Eadsorbate)) * ry_to_eV` in eV.
+- `desorption_time(t, Esys, Eadsorbant)`: Multiplies the attempt time `t` by `exp(-E_ads / kBT)` using the adsorption energy from `Eadsorption`.
 
 ---
 
-## 7. Energetics
+## Workflow Examples
 
-### 7.1 `TotalEnergy`
-
-Scan a QE SCF output log and expose the last reported total energy.
-
-```python
-te = TotalEnergy("scf.out")
-te.extract()
-te.last_TotalEnergy()
-```
-
-- `.extract()` updates `last_total_energy_ry` when encountering lines containing `"!    total energy"`.
-- `.last_TotalEnergy()` prints the stored value in Ry and eV (requires a previous call to `.extract()`).
-
-### 7.2 `SurfaceEnergyCalculator`
-
-Convert slab total energies into surface energies.
-
-```python
-sec = SurfaceEnergyCalculator()
-surface_E = sec.surf(data=[-358.412, -358.387], bulk=-179.201, N=2, area=[40.12, 40.12])
-```
-
-- Parameters: `data` (array of slab energies, Ry), `bulk` (bulk energy per formula unit, Ry), `N` (number of bulk units in the slab), `area` (surface area values, Å²).
-- Returns surface energies in J/m² (`ry_to_jm2` factor defaults to 217.9863).
-
-### 7.3 `AdsorptionCalculator`
-
-Estimate adsorption energies and desorption times for adsorbates.
-
-```python
-ads = AdsorptionCalculator(Eadsorbate=-20.321)  # Ry
-E_ads = ads.Eadsorption(Esys=-380.512, Eadsorbant=-358.941)
-tau = ads.desorption_time(t=1e-6, Esys=-380.512, Eadsorbant=-358.941)
-```
-
-- `Eadsorption(Esys, Eadsorbant)` returns `(Esys - (Eadsorbant + Eadsorbate)) * 13.6057` in eV.
-- `desorption_time(t, Esys, Eadsorbant)` applies an Arrhenius-like factor `t * exp(-E_ads / k_BT)` with `kBT` defaulting to 0.0258519 eV (~300 K).
+1. **Electronic structure**: Use `BandStructure` to load `.bands.gnu`, highlight specific bands with `plot_band_number`, and feed the instance into `EffectiveMassAnalyzer` or `EffectiveMass` for transport metrics.
+2. **Density of states**: Instantiate `PDOSPlotter` to overlay orbital contributions, while `OrbitalCenter` pinpoints the energy centroids of selected orbitals.
+3. **Real-space analysis**: Load charge-density grids with `ChargeDensitySlice`, examine planar slices, and compare pristine versus doped structures using `plot_charge_density_difference`.
+4. **Geometry review**: Combine `QeInputFile`, `Minimaout`, and `Minimain` to inspect interatomic distances and surface atom positions across input and output geometries.
+5. **Energetics**: Summarise SCF runs via `TotalEnergy`, estimate surface energies with `SurfaceEnergyCalculator`, and study adsorption thermodynamics with `AdsorptionCalculator`.
 
 ---
 
-## 8. Putting It Together
+## Tips and Extensibility
 
-Typical post-processing pipeline for a QE project:
+- **Unit discipline**: QE outputs mix Ry and eV. Confirm each method's expected units before combining results.
+- **Matplotlib styling**: The module sets `Times New Roman` globally. Override `plt.rcParams` before importing `myqetools` if you prefer a different style.
+- **Interpreter availability**: If your system lacks a `python` executable, create a virtual environment (for example `conda create -n qe python=3.10`) and install the required packages there.
+- **Custom extensions**: All classes expose NumPy arrays, making it easy to integrate additional fitting, machine learning, or plotting routines on top.
 
-1. **Electronic structure**: Use `BandStructure` to load `.bands.gnu`, plot the band diagram, and annotate important bands with `plot_band_number`. Derive transport metrics with `EffectiveMassAnalyzer`.
-2. **Density of states**: Instantiate `PDOSPlotter` to overlay orbital contributions and capture images for manuscripts. `OrbitalCenter` helps pinpoint orbital centroids.
-3. **Real-space insight**: For surfaces or defects, feed charge-density grids to `ChargeDensitySlice`, check planar slices, and compare pristine vs. doped structures with the difference helper.
-4. **Structural context**: `QeInputFile`, `Minimaout`, and `Minimain` give quick access to interatomic distances and atomic heights without leaving Python.
-5. **Energetics**: Summarise SCF outputs with `TotalEnergy`, evaluate surface energies with `SurfaceEnergyCalculator`, and study adsorption thermodynamics via `AdsorptionCalculator`.
-
-By composing these objects you can automate full QE post-processing routines directly in scripts or Jupyter notebooks tracked in your GitHub repository.
-
----
-
-## 9. Tips & Extensibility
-
-- **Consistent units**: Energies are handled in Ry internally where appropriate but reported in eV for plots; always confirm the expected unit before combining results.
-- **Matplotlib styling**: The module sets `Times New Roman` globally. Adjust `plt.rcParams` before importing if you need different fonts for publication.
-- **Missing Python interpreter**: If your environment lacks a `python` binary, set up a virtual environment (e.g. `conda create -n qe python=3.10`) and install the dependencies above.
-- **Custom pipelines**: Because each class exposes Numpy arrays, you can stack additional analysis layers (e.g. fitting, machine learning, custom plots) on top.
-
-For questions or contributions, open an issue or pull request in the repository and reference this guide to keep the documentation up to date.
+For contributions or questions, open an issue or pull request in the repository and reference this guide.
