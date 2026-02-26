@@ -1,16 +1,13 @@
-# myqetools API Guide (QE coverage update)
+# myqetools API Guide
 
-This guide documents the updated QE API that now covers broader QE capability domains and workflow orchestration.
+This guide explains the modernized API in this repository, with emphasis on the new Quantum ESPRESSO binary wrapper.
 
-## Entry points
+## Main entry points
 
 ```python
 from QE.myqetools import (
     QuantumEspressoAPI,
     QERunner,
-    QERunResult,
-    QE_BINARY_ALIASES,
-    QE_BINARY_GROUPS,
     QEInputFactory,
     BandAnalysis,
     PDOSAnalysis,
@@ -20,80 +17,91 @@ from QE.myqetools import (
 )
 ```
 
-## QuantumEspressoAPI
+## 1) Quantum ESPRESSO wrapper (inputs + binaries)
 
-High-level façade around input generation + execution.
+### `QuantumEspressoAPI`
 
-### Added execution helpers
+A unified façade for QE workflows.
 
+- `scf_or_nscf(cif, outdir, calculation_type="scf")`
+- `pdos_input(cif, outdir)`
+- `band_input(cif, outdir)`
+- `bands_post_input(cif, outdir)`
 - `supported_binaries()`
-- `supported_groups()`
-- `discover_available_binaries()`
-- `run(...)`
-- `run_many(steps)`
-- `run_group(group, input_map, output_dir=".")`
+- `run(binary, input_file=..., output_file=..., npool=..., extra_args=...)`
 
-### Example
+Example:
 
 ```python
 from QE.myqetools import QuantumEspressoAPI
 
-qe = QuantumEspressoAPI(qe_bin_dir="/opt/qe/bin", mpiexec="mpirun", mpi_nprocs=8)
+qe = QuantumEspressoAPI(qe_bin_dir="/opt/qe/bin", mpiexec="mpirun", mpi_nprocs=16)
 
-qe.scf_or_nscf("sys.cif", "./in", "scf").get_input()
-qe.run("pw", input_file="./in/scf_sys.in", output_file="./out/scf.out", npool=2)
+# make SCF input
+qe.scf_or_nscf("sample.cif", "./inputs", "scf").get_input()
 
-qe.run_many([
-    {"binary": "pw", "input_file": "./in/scf_sys.in", "output_file": "./out/scf.out"},
-    {"binary": "pw", "input_file": "./in/nscf_sys.in", "output_file": "./out/nscf.out"},
-    {"binary": "bands", "input_file": "./in/sys.bands.in", "output_file": "./out/bands.out"},
-])
+# execute pw.x
+qe.run("pw", input_file="./inputs/scf_sample.in", output_file="./outputs/scf.out")
+
+# execute projected DOS
+qe.run("projwfc", input_file="./inputs/projwfc.in", output_file="./outputs/projwfc.out")
 ```
 
-## QERunner
+## 2) Low-level binary execution only
 
-Low-level runner for direct control.
+### `QERunner`
+
+If you only want command execution without the extra façade:
 
 ```python
 from QE.myqetools import QERunner
 
 runner = QERunner(qe_bin_dir="/opt/qe/bin")
-print(runner.supported_groups())
-print(runner.discover_available_binaries())
-preview = runner.run("ph", input_file="ph.in", dry_run=True)
+print(runner.supported_binaries())
+
+# dry run
+preview = runner.run("bands", input_file="bands.in", dry_run=True)
 print(" ".join(preview.command))
 ```
 
-Group execution shortcut:
+## 3) Existing analysis wrappers
 
-```python
-runner.run_group(
-    group="interfaces",
-    input_map={
-        "pw2wannier90": "pw2wan.in",
-        "wannier_ham": "wham.in",
-    },
-    output_dir="./if_out",
-)
-```
+### `BandAnalysis`
 
-## Capability domains
+- `load(data, fermi_energy, kpoints)`
+- `plot()`
+- `plot_band(band_number, overlay=True)`
+- `plot_shifted(start_band_number, shift_value)`
+- `combine_with_pdos(...)`
 
-- PW/post-processing
-- Phonon
-- NEB
-- Interfaces/converters
-- TDDFPT
-- Spectroscopy
-- Transport/response
-- Pseudo/atomic
+### `PDOSAnalysis`
 
-## Analysis wrappers retained
+- `read(files, fermi_energy)`
+- `plot(aopdos_data, xlim=None, ylim=None)`
 
-The following wrappers remain available and unchanged in intent:
+### `ChargeDensityAnalysis`
 
-- `BandAnalysis`
-- `PDOSAnalysis`
-- `ChargeDensityAnalysis`
-- `StructureTools`
-- `XRDAnalysis`
+- initialize with `cube_files`, `dimensions`, `scale_factor`
+- call `run(output_file)`
+
+### `StructureTools`
+
+- `qe_to_xyz(input_file, output_file)`
+- `html_view(file_path)`
+
+### `XRDAnalysis`
+
+- `subtract_background(x, y, tol=1)`
+- `find_peaks(...)`
+- `plot_folder(folder_path)`
+
+## QE binaries coverage
+
+Supported shorthand aliases include major executables:
+
+`pw`, `cp`, `pp`, `dos`, `bands`, `projwfc`, `ph`, `q2r`, `matdyn`, `dynmat`, `neb`,
+`pw2wannier90`, `pw2bgw`, `pw2gw`, `pw2casino`, `pw2critic`, `turbo_lanczos`,
+`turbo_davidson`, `turbo_eels`, `turbo_spectrum`, `epsilon`, `xspectra`, `epw`, `hp`,
+`ld1`, `atomic`, `cppp`, `upfconv`.
+
+You can also pass an explicit binary name such as `"pw.x"` directly.
