@@ -1,56 +1,30 @@
-"""Public API for the QE myqetools wrapper.
+"""Public API for QEDFT utility toolkit.
 
-Notes
------
-This module uses lazy attribute loading so lightweight utilities like
-``QERunner`` can be imported without requiring heavy scientific dependencies.
+This package provides a clean, import-friendly API over the existing QE and XRD
+modules in this repository.
 """
 
+from .api import (
+    QuantumEspressoAPI,
+    BandAnalysis,
+    PDOSAnalysis,
+    QEInputFactory,
+    ChargeDensityAnalysis,
+    StructureTools,
+    XRDAnalysis,
+)
 from .qe_binaries import QERunner, QERunResult, QE_BINARY_ALIASES, QE_BINARY_GROUPS
 
 __all__ = [
     "QuantumEspressoAPI",
+    "QERunner",
+    "QERunResult",
+    "QE_BINARY_ALIASES",
+    "QE_BINARY_GROUPS",
     "BandAnalysis",
     "PDOSAnalysis",
     "QEInputFactory",
     "ChargeDensityAnalysis",
     "StructureTools",
     "XRDAnalysis",
-    "QERunner",
-    "QERunResult",
-    "QE_BINARY_ALIASES",
-    "QE_BINARY_GROUPS",
 ]
-
-
-def __getattr__(name):
-    if name in {
-        "QuantumEspressoAPI",
-        "BandAnalysis",
-        "PDOSAnalysis",
-        "QEInputFactory",
-        "ChargeDensityAnalysis",
-        "StructureTools",
-        "XRDAnalysis",
-    }:
-        from .api import (
-            QuantumEspressoAPI,
-            BandAnalysis,
-            PDOSAnalysis,
-            QEInputFactory,
-            ChargeDensityAnalysis,
-            StructureTools,
-            XRDAnalysis,
-        )
-
-        mapping = {
-            "QuantumEspressoAPI": QuantumEspressoAPI,
-            "BandAnalysis": BandAnalysis,
-            "PDOSAnalysis": PDOSAnalysis,
-            "QEInputFactory": QEInputFactory,
-            "ChargeDensityAnalysis": ChargeDensityAnalysis,
-            "StructureTools": StructureTools,
-            "XRDAnalysis": XRDAnalysis,
-        }
-        return mapping[name]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
