@@ -265,7 +265,3 @@ class QERunner:
             )
             results.append(result)
         return results
-    def run_bands_unfold(self, *args, **kwargs) -> QERunResult:
-        """Convenience wrapper for ``bands_unfold.x``."""
-        return self.run("bands_unfold", *args, **kwargs)
-

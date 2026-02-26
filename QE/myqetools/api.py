@@ -17,7 +17,6 @@ from .. import (
 )
 from XRD import BackSub, peaks, PlotTxtFiles
 from .qe_binaries import QERunner, QERunResult
-from .unfolding import BandUnfoldingAPI
 
 
 class QuantumEspressoAPI:
@@ -88,18 +87,6 @@ class QuantumEspressoAPI:
 
     def run_group(self, group: str, input_map, output_dir: str = ".", cwd: Optional[str] = None):
         return self.runner.run_group(group=group, input_map=input_map, output_dir=output_dir, cwd=cwd)
-
-    def unfolding(self) -> BandUnfoldingAPI:
-        """Return a band-unfolding helper bound to the same runner config."""
-        return BandUnfoldingAPI(runner=self.runner)
-
-    def run_bands_unfold(self, *args, **kwargs) -> QERunResult:
-        """Explicit convenience runner for ``bands_unfold.x``."""
-        return self.runner.run_bands_unfold(*args, **kwargs)
-
-    def run_python_unfold(self, *args, **kwargs):
-        """Run pure-Python unfolding via :class:`BandUnfoldingAPI`."""
-        return self.unfolding().run_like_bands_unfold(*args, **kwargs)
 
 
 class BandAnalysis:
